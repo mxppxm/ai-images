@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ImageModel, GeneratedImage } from "@/types";
+import type {
+  ImageModel,
+  VideoModel,
+  GeneratedImage,
+  GeneratedVideo,
+} from "@/types";
 import { dbService } from "@/services/dbService";
 
 interface AppState {
@@ -38,12 +43,36 @@ interface AppState {
   setIsHistoryExpanded: (expanded: boolean) => void;
 
   // 工作模式
-  workMode: "text-to-image" | "image-to-image";
-  setWorkMode: (mode: "text-to-image" | "image-to-image") => void;
+  workMode:
+    | "text-to-image"
+    | "image-to-image"
+    | "text-to-video"
+    | "image-to-video";
+  setWorkMode: (
+    mode:
+      | "text-to-image"
+      | "image-to-image"
+      | "text-to-video"
+      | "image-to-video"
+  ) => void;
 
   // 图像编辑相关
   selectedImageForEdit: GeneratedImage | null;
   setSelectedImageForEdit: (image: GeneratedImage | null) => void;
+
+  // 视频生成相关
+  selectedVideoModel: VideoModel;
+  setSelectedVideoModel: (model: VideoModel) => void;
+  availableVideoModels: VideoModel[];
+  isGeneratingVideo: boolean;
+  setIsGeneratingVideo: (generating: boolean) => void;
+  generatedVideos: GeneratedVideo[];
+  addGeneratedVideo: (video: GeneratedVideo) => Promise<void>;
+  updateVideoStatus: (taskId: string, status: Partial<GeneratedVideo>) => void;
+  clearGeneratedVideos: () => Promise<void>;
+  loadVideosFromDB: () => Promise<void>;
+  selectedImageForVideo: GeneratedImage | null;
+  setSelectedImageForVideo: (image: GeneratedImage | null) => void;
 }
 
 const defaultModels: ImageModel[] = [
@@ -58,6 +87,15 @@ const defaultModels: ImageModel[] = [
     name: "豆包 SeedEdit 3.0 (图编辑)",
     value: "doubao-seededit-3-0-i2i-250628",
     type: "image-to-image",
+  },
+];
+
+const defaultVideoModels: VideoModel[] = [
+  {
+    id: "doubao-seedance-1-0-pro-250528",
+    name: "豆包 SeedDance 1.0 Pro (视频生成)",
+    value: "doubao-seedance-1-0-pro-250528",
+    type: "text-to-video",
   },
 ];
 
@@ -130,17 +168,68 @@ export const useStore = create<AppState>()(
         set({ workMode: mode });
         // 切换模式时自动选择对应的模型
         const store = useStore.getState();
-        const targetModel = store.availableModels.find(
-          (model) => model.type === mode
-        );
-        if (targetModel) {
-          set({ selectedModel: targetModel });
+        if (mode === "text-to-image" || mode === "image-to-image") {
+          const targetModel = store.availableModels.find(
+            (model) => model.type === mode
+          );
+          if (targetModel) {
+            set({ selectedModel: targetModel });
+          }
         }
       },
 
       // 图像编辑相关
       selectedImageForEdit: null,
       setSelectedImageForEdit: (image) => set({ selectedImageForEdit: image }),
+
+      // 视频生成相关
+      selectedVideoModel: defaultVideoModels[0],
+      setSelectedVideoModel: (model) => set({ selectedVideoModel: model }),
+      availableVideoModels: defaultVideoModels,
+      isGeneratingVideo: false,
+      setIsGeneratingVideo: (generating) =>
+        set({ isGeneratingVideo: generating }),
+      generatedVideos: [],
+      addGeneratedVideo: async (video) => {
+        // 先添加到内存状态
+        set((state) => ({
+          generatedVideos: [video, ...state.generatedVideos],
+        }));
+        // 然后保存到 IndexedDB
+        try {
+          await dbService.saveVideo(video);
+        } catch (error) {
+          console.error("Failed to save video to database:", error);
+        }
+      },
+      updateVideoStatus: (taskId, status) => {
+        set((state) => ({
+          generatedVideos: state.generatedVideos.map((video) =>
+            video.task_id === taskId ? { ...video, ...status } : video
+          ),
+        }));
+      },
+      clearGeneratedVideos: async () => {
+        // 先清空内存状态
+        set({ generatedVideos: [] });
+        // 然后清空 IndexedDB
+        try {
+          await dbService.clearAllVideos();
+        } catch (error) {
+          console.error("Failed to clear videos from database:", error);
+        }
+      },
+      loadVideosFromDB: async () => {
+        try {
+          const videos = await dbService.getAllVideos();
+          set({ generatedVideos: videos });
+        } catch (error) {
+          console.error("Failed to load videos from database:", error);
+        }
+      },
+      selectedImageForVideo: null,
+      setSelectedImageForVideo: (image) =>
+        set({ selectedImageForVideo: image }),
     }),
     {
       name: "text-to-image-storage",
@@ -151,6 +240,7 @@ export const useStore = create<AppState>()(
         guidanceScale: state.guidanceScale,
         isHistoryExpanded: state.isHistoryExpanded,
         workMode: state.workMode,
+        selectedVideoModel: state.selectedVideoModel,
       }),
     }
   )

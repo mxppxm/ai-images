@@ -1,5 +1,13 @@
 import React from "react";
-import { ArrowLeft, Edit3, Sparkles, Download, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Edit3,
+  Sparkles,
+  Download,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +27,7 @@ export function ImageEditor() {
     guidanceScale,
     addGeneratedImage,
     setIsSettingsOpen,
+    generatedImages,
   } = useStore();
   const { convertToProxy, convertToOriginal } = useImageProxy();
 
@@ -27,6 +36,7 @@ export function ImageEditor() {
   const [error, setError] = React.useState("");
   const [editHistory, setEditHistory] = React.useState<GeneratedImage[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+  const [isGalleryExpanded, setIsGalleryExpanded] = React.useState(true);
 
   // 当选中的图片改变时，重置编辑历史
   React.useEffect(() => {
@@ -132,6 +142,32 @@ export function ImageEditor() {
 
   const canGoBack = currentImageIndex > 0;
   const canGoForward = currentImageIndex < editHistory.length - 1;
+
+  // 切换正在编辑的图片
+  const handleSwitchEditImage = (image: GeneratedImage) => {
+    setSelectedImageForEdit(image);
+  };
+
+  // 下载生成记录中的图片
+  const handleDownloadGalleryImage = async (
+    imageUrl: string,
+    index: number
+  ) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `generated-image-${Date.now()}-${index}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Failed to download image:", error);
+    }
+  };
 
   if (!selectedImageForEdit) {
     return null;
@@ -318,6 +354,93 @@ export function ImageEditor() {
           </Card>
         </div>
       </div>
+
+      {/* 生成记录区域 */}
+      {generatedImages.length > 0 && (
+        <div className="space-y-4 mt-8">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">
+              生成记录 ({generatedImages.length})
+            </h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsGalleryExpanded(!isGalleryExpanded)}
+              className="flex items-center gap-2"
+            >
+              {isGalleryExpanded ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  收起
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  展开
+                </>
+              )}
+            </Button>
+          </div>
+
+          {isGalleryExpanded && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {generatedImages.map((image, index) => (
+                <Card
+                  key={index}
+                  className={`overflow-hidden group relative cursor-pointer transition-all ${
+                    selectedImageForEdit?.url === image.url
+                      ? "ring-2 ring-primary"
+                      : "hover:ring-1 hover:ring-muted-foreground/50"
+                  }`}
+                  onClick={() => handleSwitchEditImage(image)}
+                >
+                  <div className="aspect-square relative">
+                    <img
+                      src={convertToProxy(image.url)}
+                      alt={`Generated image ${index + 1}`}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
+                    />
+
+                    {/* 当前编辑标识 */}
+                    {selectedImageForEdit?.url === image.url && (
+                      <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full font-medium">
+                        正在编辑
+                      </div>
+                    )}
+
+                    {/* 下载按钮 */}
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        image.url &&
+                          handleDownloadGalleryImage(image.url, index);
+                      }}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {(image.original_prompt || image.revised_prompt) && (
+                    <div className="p-3 border-t">
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {image.original_prompt || image.revised_prompt}
+                      </p>
+                      {image.edit_prompt && (
+                        <p className="text-xs text-primary mt-1">
+                          编辑：{image.edit_prompt}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

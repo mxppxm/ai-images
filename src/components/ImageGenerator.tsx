@@ -1,5 +1,12 @@
 import React from "react";
-import { Sparkles, Trash2, Download, Wand2 } from "lucide-react";
+import {
+  Sparkles,
+  Trash2,
+  Download,
+  Wand2,
+  Video,
+  PlayCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +21,7 @@ import { ImageGenerationService } from "@/services/imageService";
 import { ImageGallery } from "./ImageGallery";
 import { ImageSelector } from "./ImageSelector";
 import { ImageEditor } from "./ImageEditor";
+import { VideoGenerator } from "./VideoGenerator";
 // import { ComingSoonNotice } from "./ComingSoonNotice";
 import { useImageProxy } from "@/hooks/useImageProxy";
 import type { GeneratedImage } from "@/types";
@@ -119,17 +127,27 @@ export function ImageGenerator() {
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-            {workMode === "text-to-image" ? "AI 文生图" : "AI 图像编辑"}
+            {workMode === "text-to-image"
+              ? "AI 文生图"
+              : workMode === "image-to-image"
+              ? "AI 图像编辑"
+              : workMode === "text-to-video"
+              ? "AI 文生视频"
+              : "AI 图生视频"}
           </h1>
           <p className="text-muted-foreground">
             {workMode === "text-to-image"
               ? "使用豆包模型将文字描述转换为精美图像"
-              : "通过对话不断优化和编辑图像"}
+              : workMode === "image-to-image"
+              ? "通过对话不断优化和编辑图像"
+              : workMode === "text-to-video"
+              ? "使用文字描述生成精彩视频"
+              : "将图像转换为动态视频"}
           </p>
 
           {/* 模式切换按钮 */}
           <div className="flex justify-center mt-6">
-            <div className="inline-flex rounded-lg border p-1 bg-muted">
+            <div className="inline-grid grid-cols-2 md:grid-cols-4 gap-1 rounded-lg border p-1 bg-muted">
               <Button
                 variant={workMode === "text-to-image" ? "default" : "ghost"}
                 size="sm"
@@ -147,6 +165,24 @@ export function ImageGenerator() {
               >
                 <Wand2 className="mr-2 h-4 w-4" />
                 图编辑
+              </Button>
+              <Button
+                variant={workMode === "text-to-video" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setWorkMode("text-to-video")}
+                className="rounded-md"
+              >
+                <Video className="mr-2 h-4 w-4" />
+                文生视频
+              </Button>
+              <Button
+                variant={workMode === "image-to-video" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setWorkMode("image-to-video")}
+                className="rounded-md"
+              >
+                <PlayCircle className="mr-2 h-4 w-4" />
+                图生视频
               </Button>
             </div>
           </div>
@@ -257,10 +293,15 @@ export function ImageGenerator() {
 
             <ImageGallery />
           </>
-        ) : (
+        ) : workMode === "image-to-image" ? (
           <>
             {/* 图像编辑模式 */}
             {!selectedImageForEdit ? <ImageSelector /> : <ImageEditor />}
+          </>
+        ) : (
+          <>
+            {/* 视频生成模式 */}
+            <VideoGenerator />
           </>
         )}
 

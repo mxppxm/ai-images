@@ -6,7 +6,17 @@ import { useStore } from "@/store/useStore";
 import { useImageProxy } from "@/hooks/useImageProxy";
 import type { GeneratedImage } from "@/types";
 
-export function ImageSelector() {
+interface ImageSelectorProps {
+  onImageSelect?: (image: GeneratedImage) => void;
+  title?: string;
+  showBackButton?: boolean;
+}
+
+export function ImageSelector({
+  onImageSelect,
+  title = "选择要编辑的图片",
+  showBackButton = true,
+}: ImageSelectorProps = {}) {
   const {
     generatedImages,
     selectedImageForEdit,
@@ -16,7 +26,11 @@ export function ImageSelector() {
   const { convertToProxy } = useImageProxy();
 
   const handleSelectImage = (image: GeneratedImage) => {
-    setSelectedImageForEdit(image);
+    if (onImageSelect) {
+      onImageSelect(image);
+    } else {
+      setSelectedImageForEdit(image);
+    }
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,7 +43,11 @@ export function ImageSelector() {
           url: result,
           original_prompt: "上传的图片",
         };
-        setSelectedImageForEdit(uploadedImage);
+        if (onImageSelect) {
+          onImageSelect(uploadedImage);
+        } else {
+          setSelectedImageForEdit(uploadedImage);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -38,15 +56,17 @@ export function ImageSelector() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">选择要编辑的图片</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setWorkMode("text-to-image")}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          返回文生图
-        </Button>
+        <h2 className="text-lg font-semibold">{title}</h2>
+        {showBackButton && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setWorkMode("text-to-image")}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            返回文生图
+          </Button>
+        )}
       </div>
 
       {/* 上传图片 */}
@@ -83,11 +103,7 @@ export function ImageSelector() {
             {generatedImages.map((image, index) => (
               <Card
                 key={index}
-                className={`overflow-hidden cursor-pointer transition-all duration-200 hover:scale-105 ${
-                  selectedImageForEdit === image
-                    ? "ring-2 ring-primary ring-offset-2"
-                    : ""
-                }`}
+                className="overflow-hidden cursor-pointer transition-all duration-200 hover:scale-105"
                 onClick={() => handleSelectImage(image)}
               >
                 <div className="aspect-square relative">
@@ -96,7 +112,7 @@ export function ImageSelector() {
                     alt={`Generated image ${index + 1}`}
                     className="w-full h-full object-cover"
                   />
-                  {selectedImageForEdit === image && (
+                  {!onImageSelect && selectedImageForEdit === image && (
                     <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
                       <div className="bg-primary text-primary-foreground px-2 py-1 rounded-full text-xs font-medium">
                         已选择
